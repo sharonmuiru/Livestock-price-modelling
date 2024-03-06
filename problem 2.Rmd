@@ -1,0 +1,215 @@
+---
+title: "Problem 2"
+author: "Sharon Njeri"
+date: "2024-03-05"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(ggplot2)
+library(forecast)
+library(readxl)
+```
+# Load the data
+```{r}
+# Load the data
+data <- read_excel("C:/Users/User/Downloads/Makert Prices 2022.xlsx")
+library(readxl)
+```
+
+```{r}
+# merging entries with different case
+data <- data %>%
+  mutate(Seasons = case_when(
+    Seasons == "dry" ~ "Dry",
+    Seasons == "wet" ~ "Wet",
+    TRUE ~ Seasons
+  ))
+```
+
+```{r}
+# Convert the Dates column to Date type
+data$Dates <- as.Date(data$Dates, format="%m/%d/%Y")
+```
+
+```{r}
+# Perform exploratory analysis
+summary(data)
+```
+
+```{r}
+# Create dummy variables for seasons
+data$Drought <- ifelse(data$Seasons == "Drought", 1, 0)
+data$Wet <- ifelse(data$Seasons == "Wet", 1, 0)
+data$Dry <- ifelse(data$Seasons == "Dry", 1, 0)
+```
+
+# Modelling
+```{r}
+# creating a matrix of external regressors for the arima model
+exreg= as.matrix(cbind(data$Drought,data$Wet,data$Dry))
+colnames(exreg) <- c("Drought", "Wet", "Dry")
+```
+
+```{r}
+# Fit ARIMA model with  season as external regressor.
+Bull_model<- auto.arima(data$Bull, xreg = exreg )
+Cow_model<- auto.arima(data$Cow, xreg = exreg )
+Heifer_model<- auto.arima(data$Heifer, xreg = exreg )
+Steer_model<- auto.arima(data$Steer, xreg = exreg )
+```
+
+```{r}
+# Get the summary of each model
+summary(Bull_model)
+```
+The model suggests that selling during a drought could lead to a decrease in price (coefficient: -1441.386), while selling during wet (coefficient: 1300.870) and dry (coefficient: 997.2451) seasons could lead to an increase in price. However, the standard errors are quite large, indicating a high degree of uncertainty in these estimates.
+```{r}
+summary(Cow_model)
+```
+The model suggests that selling during a drought could lead to a slight decrease in price (coefficient: -34.9539), while selling during wet (coefficient: 1309.246) and dry (coefficient: 94.7516) seasons could lead to an increase in price. The standard errors are also quite large for this model.
+```{r}
+summary(Heifer_model)
+```
+Cow: The model suggests that selling during a drought could lead to a slight decrease in price (coefficient: -34.9539), while selling during wet (coefficient: 1309.246) and dry (coefficient: 94.7516) seasons could lead to an increase in price. The standard errors are also quite large for this model.
+```{r}
+summary(Steer_model)
+```
+
+```{r}
+
+# Get the seasons for the last 12 months
+last_12_seasons <- tail(exreg, 12)
+
+# Create a future exreg matrix based on these seasons
+future_exreg <- model.matrix(~last_12_seasons-1)
+colnames(future_exreg) <- c("Drought", "Wet", "Dry")
+
+# Forecast the next 12 months
+Bull_forecast <- forecast(Bull_model, h=12, xreg=future_exreg)
+Cow_forecast <- forecast(Cow_model, h=12, xreg=future_exreg)
+Heifer_forecast <- forecast(Heifer_model, h=12, xreg=future_exreg)
+Steer_forecast <- forecast(Steer_model, h=12, xreg=future_exreg)
+
+```
+
+# Plotting the forecasts.
+
+1.  Bull
+
+```{r,fig.dpi=900}
+# Create a data frame for the historical data
+historical_data <- data.frame(
+  Dates = data$Dates,
+  Price = data$Bull
+)
+
+# Create a data frame for the forecasted data
+forecast_data <- data.frame(
+  Dates = seq(max(data$Dates), by = "month", length.out = 12),
+  Price = as.numeric(Bull_forecast$mean)
+)
+
+# Combine the historical and forecasted data
+combined_data <- rbind(historical_data, forecast_data)
+
+# Convert 'Dates' to Date class
+combined_data$Dates <- as.Date(combined_data$Dates)
+
+ggplot() +
+  geom_line(data = historical_data, aes(x=Dates, y=Price), color = "blue") +
+  geom_line(data = forecast_data, aes(x=Dates, y=Price), color = "red") +
+  labs(x = "Dates", y = "Price", title = "Market Price Over Time: Bull")
+```
+
+
+
+2.  Cow
+
+```{r,fig.dpi=900}
+
+# Create a data frame for the historical data
+historical_data_cow <- data.frame(
+  Dates = data$Dates,
+  Price = data$Cow
+)
+
+# Create a data frame for the forecasted data
+forecast_data_cow <- data.frame(
+  Dates = seq(max(data$Dates), by = "month", length.out = 12),
+  Price = as.numeric(Cow_forecast$mean)
+)
+
+# Combine the historical and forecasted data
+combined_data_cow <- rbind(historical_data_cow, forecast_data_cow)
+
+# Convert 'Dates' to Date class
+combined_data_cow$Dates <- as.Date(combined_data_cow$Dates)
+
+ggplot() +
+  geom_line(data = historical_data_cow, aes(x=Dates, y=Price), color = "blue") +
+  geom_line(data = forecast_data_cow, aes(x=Dates, y=Price), color = "red") +
+  labs(x = "Dates", y = "Price", title = "Market Price Over Time: Cow")
+
+```
+
+3.  Heifer
+```{r, fig.dpi=900}
+# Create a data frame for the historical data
+historical_data_heifer <- data.frame(
+  Dates = data$Dates,
+  Price = data$Heifer
+)
+
+# Create a data frame for the forecasted data
+forecast_data_heifer <- data.frame(
+  Dates = seq(max(data$Dates), by = "month", length.out = 12),
+  Price = as.numeric(Heifer_forecast$mean)
+)
+
+# Combine the historical and forecasted data
+combined_data_heifer <- rbind(historical_data_heifer, forecast_data_heifer)
+
+# Convert 'Dates' to Date class
+combined_data_heifer$Dates <- as.Date(combined_data_heifer$Dates)
+
+ggplot() +
+  geom_line(data = historical_data_heifer, aes(x=Dates, y=Price), color = "blue") +
+  geom_line(data = forecast_data_heifer, aes(x=Dates, y=Price), color = "red") +
+  labs(x = "Dates", y = "Price", title = "Market Price Over Time: Heifer")
+```
+4.  Steer
+```{r,fig.dpi=900}
+# Steer
+# Create a data frame for the historical data
+historical_data_steer <- data.frame(
+  Dates = data$Dates,
+  Price = data$Steer
+)
+
+# Create a data frame for the forecasted data
+forecast_data_steer <- data.frame(
+  Dates = seq(max(data$Dates), by = "month", length.out = 12),
+  Price = as.numeric(Steer_forecast$mean)
+)
+
+# Combine the historical and forecasted data
+combined_data_steer <- rbind(historical_data_steer, forecast_data_steer)
+
+# Convert 'Dates' to Date class
+combined_data_steer$Dates <- as.Date(combined_data_steer$Dates)
+
+ggplot() +
+  geom_line(data = historical_data_steer, aes(x=Dates, y=Price), color = "blue") +
+  geom_line(data = forecast_data_steer, aes(x=Dates, y=Price), color = "red") +
+  labs(x = "Dates", y = "Price", title = "Market Price Over Time: Steer")
+
+```
